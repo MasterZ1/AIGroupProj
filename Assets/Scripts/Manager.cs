@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 
 public class Manager : MonoBehaviour
@@ -9,14 +10,38 @@ public class Manager : MonoBehaviour
     public Material blueMaterial;
     public GameObject xObject;
     public GameObject oObject;
+    public GameObject gridPointObject;
     public GameObject highlight;
     public GameObject currentGrid;
+    public List<GameObject> currentMoves;
 
-    void GetMove(string gridPoint)
+    void PopulateMoves()
     {
-        if (gridPoint == currentGrid.name)
+        currentMoves = new List<GameObject>();
+        foreach(Transform child in currentGrid.transform)
         {
-            Transform placement = currentGrid.transform.Find("Grid Points/" + gridPoint).transform;
+            if (PrefabUtility.GetPrefabType(child.gameObject) == PrefabUtility.GetPrefabType(gridPointObject))
+            {
+                currentMoves.Add(child.gameObject);
+            }
+        }
+    }
+
+    void GetMove(GameObject gridPoint)
+    {
+        if (currentMoves.Contains(gridPoint))
+        {
+            Vector3 placement = gridPoint.transform.position;
+            GameObject move;
+            if (currentPlayer == false)
+                move = Instantiate(xObject);
+            else
+                move = Instantiate(oObject);
+            move.transform.position = placement;
+
+            currentGrid = GameObject.Find("Main Grid/Grid Spots/" + gridPoint.name);
+            Destroy(gridPoint);
+            PopulateMoves();
         }
     }
 
