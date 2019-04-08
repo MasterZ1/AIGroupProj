@@ -5,6 +5,45 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Text;
 
+// Tools
+public static class EnumerableUtilities
+{
+    public static IEnumerable<int> RangeStep(int start, int stop, int step = 1)
+    {
+        if (step == 0)
+            throw new ArgumentException("Parameter step cannot equal zero.");
+
+        if (start < stop && step > 0)
+        {
+            for (var i = start; i < stop; i += step)
+            {
+                yield return i;
+            }
+        }
+        else if (start > stop && step < 0)
+        {
+            for (var i = start; i > stop; i += step)
+            {
+                yield return i;
+            }
+        }
+    }
+
+    public static IEnumerable<int> RangeStep(int stop)
+    {
+        return RangeStep(0, stop);
+    }
+
+    public static bool Between(this int num, int lower, int upper, bool inclusive = false)
+    {
+        return inclusive
+            ? lower <= num && num <= upper
+            : lower < num && num < upper;
+    }
+}
+
+
+
 public class GameManager : MonoBehaviour
 {
     public int depth = 20;
@@ -16,37 +55,10 @@ public class GameManager : MonoBehaviour
     private Tuple<int, int> user_input;
     private Tuple<int, int> user_move;
     private bool user_moved = false;
-    private bool user_turn = true;
+    private bool gameOver = false;
+    
 
-    public static class EnumerableUtilities
-    {
-        public static IEnumerable<int> RangeStep(int start, int stop, int step = 1)
-        {
-            if (step == 0)
-                throw new ArgumentException("Parameter step cannot equal zero.");
-
-            if (start < stop && step > 0)
-            {
-                for (var i = start; i < stop; i += step)
-                {
-                    yield return i;
-                }
-            }
-            else if (start > stop && step < 0)
-            {
-                for (var i = start; i > stop; i += step)
-                {
-                    yield return i;
-                }
-            }
-        }
-
-        public static IEnumerable<int> RangeStep(int stop)
-        {
-            return RangeStep(0, stop);
-        }
-    }
-
+    // Game Functions
     int get_index(int x, int y)
     {
         x -= 1;
@@ -87,9 +99,19 @@ public class GameManager : MonoBehaviour
         return to1D;
     }
 
-    List<int> get_possible_moves(int last_move)
+    List<int> get_possible_moves(Tuple<int, int> last_move)
     {
-        int box_to_play = next_box(last_move);
+        int moveidx;
+        if (last_move.Item2 != int.MinValue)
+        {
+            moveidx = get_index(last_move.Item1, last_move.Item2);
+        }
+        else
+        {
+            moveidx = last_move.Item1;
+        }
+
+        int box_to_play = next_box(moveidx);
         List<int> idxs = indicies_of_box(box_to_play);
         if (box_won[box_to_play] != ".")
         {
@@ -109,16 +131,9 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    public static bool Between(this int num, int lower, int upper, bool inclusive = false)
-    {
-        return inclusive
-            ? lower <= num && num <= upper
-            : lower < num && num < upper;
-    }
-
     bool isValidInput(string state, Tuple<int, int> move)
     {
-        if (!(Between(move.Item1, 0, 10) && Between(move.Item1, 0, 10)))
+        if (!(EnumerableUtilities.Between(move.Item1, 0, 10) && EnumerableUtilities.Between(move.Item1, 0, 10)))
             return false;
         if (box_won[box(move.Item1, move.Item2)] != ".")
             return false;
@@ -129,7 +144,7 @@ public class GameManager : MonoBehaviour
 
     Tuple<int, int> check_input(string state, int bot_move)
     {
-        List<int> possible_moves = get_possible_moves(bot_move);
+        List<int> possible_moves = get_possible_moves(new Tuple<int, int>(bot_move, int.MinValue));
 
         if (bot_move != -1 && !possible_moves.Contains(get_index(user_input.Item1, user_input.Item2)))
         {
@@ -144,11 +159,11 @@ public class GameManager : MonoBehaviour
         return user_input;
     }
 
-    string check_small_box(List<string> box_str)
+    string check_small_box(string box_str)
     {
         foreach(Tuple<int, int, int> idxs in possible_goals)
         {
-            if ((box_str[idxs.Item1] == box_str[idxs.Item2] && box_str[idxs.Item1] == box_str[idxs.Item3]) && (box_str[idxs.Item1] != "."))
+            if ((box_str[idxs.Item1] == box_str[idxs.Item2] && box_str[idxs.Item1] == box_str[idxs.Item3]) && (box_str[idxs.Item1] != '.'))
             {
                 return box_str[idxs.Item1].ToString();
             }
@@ -172,7 +187,7 @@ public class GameManager : MonoBehaviour
     string add_piece(string state, Tuple<int, int> move, char player)
     {
         int moveidx;
-        if (move.Item2 != -999)
+        if (move.Item2 != int.MinValue)
         {
             moveidx = get_index(move.Item1, move.Item2);
         }
@@ -185,6 +200,140 @@ public class GameManager : MonoBehaviour
         return newState.ToString();
     }
 
+    List<Tuple<string, int>> recurse(string state, string player, Tuple<int, int> last_move)
+    {
+        List<string> succ = new List<string>();
+        List<int> moves_idx = new List<int>();
+        List<int> possible_indexes = get_possible_moves(last_move);
+        foreach (int idx in possible_indexes)
+        {
+            if (state[idx] == '.')
+            {
+                moves_idx.Add(idx);
+                succ.Add(add_piece(state, new Tuple<int, int>(idx, int.MinValue), player[0]));
+            }
+        }
+        List<Tuple<string, int>> pairs = new List<Tuple<string, int>>();
+        for (int i = 0; i < succ.Count; i++)
+        {
+            pairs.Add(new Tuple<string, int>(succ[i], moves_idx[1]));
+        }
+        return pairs;
+    }
+
+    int evaluate_small_box(string box_str, string player)
+    {
+        int score = 0;
+        string three = player + player + player;
+        string two = player + player + ".";
+        string one = player + "." + ".";
+        string three_opp = opponent(player) + opponent(player) + opponent(player);
+        string two_opp = opponent(player) + opponent(player) + ".";
+        string one_opp = opponent(player) + "." + ".";
+
+        foreach(Tuple<int, int, int> goal in possible_goals)
+        {
+            string current = box_str[goal.Item1].ToString() + box_str[goal.Item2].ToString() + box_str[goal.Item3].ToString();
+            if (current == three)
+                score += 100;
+            else if (current == two)
+                score += 10;
+            else if (current == one)
+                score += 1;
+            else if (current == three_opp)
+                score -= 100;
+            else if (current == two_opp)
+                score -= 10;
+            else if (current == one_opp)
+                score -= 1;
+        }
+
+        return score;
+    }
+
+    int evaluate(string state, string player)
+    {
+        int score = 0;
+        string box_wonI = "";
+        foreach (string i in box_won) { box_wonI += i; }
+        score += evaluate_small_box(box_wonI, player) * 200;
+        for (int i = 0; i < 9; i++)
+        {
+            List<int> idxs = indicies_of_box(i);
+            string box_str = state.Substring(idxs[0], idxs[-1] + 1);
+            score += evaluate_small_box(box_str, player);
+        }
+        return score;
+    }
+
+    string opponent(string p)
+    {
+        if (p == "X")
+            return "O";
+        else
+            return "X";
+    }
+
+    Tuple<string, int> minimax(string state, Tuple<int, int> last_move, string player, int depth)
+    {
+        List<Tuple<string, int>> succ = recurse(state, player, last_move);
+        Tuple<float, Tuple<string, int>> best_move = new Tuple<float, Tuple<string, int>>(float.NegativeInfinity, null);
+        foreach(Tuple<string, int> s in succ)
+        {
+            float val = min_turn(s.Item1, new Tuple<int, int>(s.Item2, int.MinValue), opponent(player), depth - 1, float.NegativeInfinity, float.PositiveInfinity);
+            if (val > best_move.Item1)
+            {
+                best_move = new Tuple<float, Tuple<string, int>>(val, s);
+            }
+        }
+        return best_move.Item2;
+    }
+
+    float min_turn(string state, Tuple<int, int> last_move, string player, int depth, float alpha, float beta)
+    {
+        string box_wonI = "";
+        foreach (string i in box_won) {box_wonI += i;}
+        if (depth <= 0 || check_small_box(box_wonI) != ".")
+        {
+            return evaluate(state, opponent(player));
+        }
+        List<Tuple<string, int>> succ = recurse(state, player, last_move);
+        foreach (Tuple<string, int> s in succ)
+        {
+            float val = max_turn(s.Item1, new Tuple<int, int>(s.Item2, int.MinValue), opponent(player), depth - 1, alpha, beta);
+            if (val > beta)
+            {
+                beta = val;
+            }
+            if (alpha >= beta)
+                break;
+        }
+        return beta;
+    }
+
+    float max_turn(string state, Tuple<int, int> last_move, string player, int depth, float alpha, float beta)
+    {
+        string box_wonI = "";
+        foreach (string i in box_won) {box_wonI += i;}
+        if (depth <= 0 || check_small_box(box_wonI) != ".")
+        {
+            return evaluate(state, player);
+        }
+        List<Tuple<string, int>> succ = recurse(state, player, last_move);
+        foreach (Tuple<string, int> s in succ)
+        {
+            float val = min_turn(s.Item1, new Tuple<int, int>(s.Item2, int.MinValue), opponent(player), depth - 1, alpha, beta);
+            if (alpha < val)
+            {
+                alpha = val;
+            }
+            if (alpha >= beta)
+                break;
+        }
+        return alpha;
+    }
+
+    // Unity Functions
     void Start()
     {
         state = string.Concat(Enumerable.Repeat(".", 81));
@@ -198,10 +347,13 @@ public class GameManager : MonoBehaviour
         possible_goals.Add(new Tuple<int, int, int>(6, 7, 8));
         box_won = update_box_won(state);
         bot_move = -1;
+        user_input = new Tuple<int, int>(1, 2);
+        user_moved = true;
     }
 
-    public void doMove()
+    public void doMove(int x, int y)
     {
+        user_input = new Tuple<int, int>(x, y);
         user_moved = true;
     }
 
@@ -212,43 +364,66 @@ public class GameManager : MonoBehaviour
 
     void update_winner(string game_won)
     {
-
+        gameOver = true;
     }
 
     void Update()
     {
-        // Waiting on player input
-        if (user_turn)
+        if (!gameOver)
         {
+            // Waiting on player input
             if (user_moved)
             {
+                Console.WriteLine("Doing Player");
                 try
                 {
+                    // Check and see if the input was valid
                     user_move = check_input(state, bot_move);
                 }
                 catch
                 {
-                    // Bad move do nothing
+                    // Invalid input leave and do nothing
                     user_moved = false;
                     return;
                 }
 
                 string user_state = add_piece(state, user_move, 'X');
+                Console.WriteLine(user_state);
                 update_board(user_state);
                 box_won = update_box_won(user_state);
-                string game_won = check_small_box(box_won);
+                string box_wonI = "";
+                foreach (string i in box_won)
+                {
+                    box_wonI += i;
+                }
+                string game_won = check_small_box(box_wonI);
                 if (game_won != ".")
                 {
                     update_winner(game_won);
+                    return;
                 }
-                user_turn = false;
-            }
-        }
-        
-        // Go on ahead mr.bot
-        if (user_moved)
-        {
 
+                Console.WriteLine("Doing Bot");
+                // Go on ahead mr.bot
+                Tuple<string, int> mm = minimax(user_state, user_move, "O", depth);
+                string bot_state = mm.Item1;
+                Console.WriteLine(bot_state);
+                bot_move = mm.Item2;
+                state = bot_state;
+                box_won = update_box_won(bot_state);
+                box_wonI = "";
+                foreach (string i in box_won)
+                {
+                    box_wonI += i;
+                }
+                game_won = check_small_box(box_wonI);
+                if (game_won == ".")
+                {
+                    update_winner(game_won);
+                    return;
+                }
+                user_moved = false;
+            }
         }
     }
 }
