@@ -3,8 +3,8 @@ using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Text;
+using UnityEngine.UI;
 
-// Tools
 public static class EnumerableUtilities
 {
     public static IEnumerable<int> RangeStep(int start, int stop, int step = 1)
@@ -46,6 +46,8 @@ public class GameManager : MonoBehaviour
     public int depth = 5;
     public GameObject playerPrefab;
     public GameObject botPrefab;
+    public GameObject coverPrefab;
+    public Material transparentMat;
 
     private string state;
     private List<Tuple<int, int, int>> possible_goals = new List<Tuple<int, int, int>>();
@@ -55,8 +57,11 @@ public class GameManager : MonoBehaviour
     private Tuple<int, int> user_move;
     private bool gameOver = false;
     private bool inputSuccess = false;
+    private Transform bigHighlight;
+    private List<int> boardsWon = new List<int>();
+    private List<List<int>> boardspots = new List<List<int>>();
+    string user_state;
 
-    // Game Functions
     int get_index(int x, int y)
     {
         x -= 1;
@@ -131,7 +136,7 @@ public class GameManager : MonoBehaviour
 
     bool isValidInput(string state, Tuple<int, int> move)
     {
-        if (!(EnumerableUtilities.Between(move.Item1, 0, 10) && EnumerableUtilities.Between(move.Item1, 0, 10)))
+        if (!(EnumerableUtilities.Between(move.Item1, 0, 10) && EnumerableUtilities.Between(move.Item2, 0, 10)))
             return false;
         if (box_won[box(move.Item1, move.Item2)] != ".")
             return false;
@@ -158,7 +163,7 @@ public class GameManager : MonoBehaviour
 
         return user_input;
     }
-
+    
     string check_small_box(string box_str)
     {
         foreach(Tuple<int, int, int> idxs in possible_goals)
@@ -169,6 +174,70 @@ public class GameManager : MonoBehaviour
             }
         }
         return ".";
+    }
+
+    void updateBoardWin(string winner, int num)
+    {
+        if (!boardsWon.Contains(num))
+            boardsWon.Add(num);
+        else
+            return;
+        
+        Transform parent;
+        float yAdj = 0;
+        if (num == 0)
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Top Left").transform;
+            yAdj = 0.9f;
+        }
+        else if (num == 1)
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Top Middle").transform;
+            yAdj = 0.9f;
+        }
+        else if (num == 2)
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Top Right").transform;
+            yAdj = 0.9f;
+        }
+        else if (num == 3)
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Middle Left").transform;
+            yAdj = 0.5f;
+        }
+        else if (num == 4)
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Middle Middle").transform;
+            yAdj = 0.5f;
+        }
+        else if (num == 5)
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Middle Right").transform;
+            yAdj = 0.5f;
+        }
+        else if (num == 6)
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Bottom Left").transform;
+            yAdj = 0.1f;
+        }
+        else if (num == 7)
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Bottom Middle").transform;
+            yAdj = 0.1f;
+        }
+        else
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Bottom Right").transform;
+            yAdj = 0.1f;
+        }
+
+        var spawn = Instantiate(coverPrefab);
+        spawn.transform.position = parent.transform.position;
+        spawn.transform.position = new Vector3(spawn.transform.position.x, spawn.transform.position.y + yAdj, spawn.transform.position.z - 1);
+        if (winner == "X")
+            spawn.GetComponent<Renderer>().material = playerPrefab.GetComponentInChildren<Renderer>().sharedMaterial;
+        else
+            spawn.GetComponent<Renderer>().material = botPrefab.GetComponentInChildren<Renderer>().sharedMaterial;
     }
 
     List<string> update_box_won(string state)
@@ -182,7 +251,10 @@ public class GameManager : MonoBehaviour
             foreach(int p in idxs_box) { pr += p + " "; }
             int length = idxs_box[idxs_box.Count - 1] - idxs_box[0] + 1;
             string box_str = state.Substring(idxs_box[0], length);
-            temp[k] = check_small_box(box_str);
+            string potentialWinner = check_small_box(box_str);
+            if (potentialWinner != ".")
+                updateBoardWin(potentialWinner, k);
+            temp[k] = potentialWinner;
         }
         return temp;
     }
@@ -348,13 +420,27 @@ public class GameManager : MonoBehaviour
         possible_goals.Add(new Tuple<int, int, int>(0, 1, 2));
         possible_goals.Add(new Tuple<int, int, int>(3, 4, 5));
         possible_goals.Add(new Tuple<int, int, int>(6, 7, 8));
+        for (int i = 0; i < 9; i++)
+        {
+            boardspots.Add(new List<int>() { 0 + (i * 8) + i, 1 + (i * 8) + i, 2 + (i * 8) + i,
+                                             3 + (i * 8) + i, 4 + (i * 8) + i, 5 + (i * 8) + i,
+                                             6 + (i * 8) + i, 7 + (i * 8) + i, 8 + (i * 8) + i });
+        }
         box_won = update_box_won(state);
         bot_move = -1;
+        bigHighlight = GameObject.Find("Highlight").transform;
+        GameObject.Find("Canvas/Action Text").GetComponent<Text>().text = "Red player is deciding where to play...";
     }
 
-    void update_winner(string game_won)
+    void update_winner(string winner)
     {
-        //gameOver = true;
+        if (winner == "O")
+            GameObject.Find("Canvas/Action Text").GetComponent<Text>().text = "Blue player has won the game!!!";
+        else
+            GameObject.Find("Canvas/Action Text").GetComponent<Text>().text = "Red player has won the game!!!";
+
+        gameOver = true;
+        Destroy(GameObject.Find("Highlight"));
     }
 
     void placeBot(string n, string o)
@@ -396,14 +482,79 @@ public class GameManager : MonoBehaviour
                     else
                         childGridXY += "Left";
 
+                    Transform parentTransform = GameObject.Find("Main Grid/Grid Spots/" + parentGridXY + "/Grid Points/" + childGridXY).transform;
                     var spawn = Instantiate(botPrefab);
-                    spawn.transform.position = GameObject.Find("Main Grid/Grid Spots/" + parentGridXY + "/Grid Points/" + childGridXY).transform.position;
+                    spawn.transform.position = parentTransform.position;
                 }
             }
         }
     }
 
-    string user_state;
+    void updateHighlight(int num)
+    {
+        Transform parent;
+        float yAdj = 0;
+        if (num == 0)
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Top Left").transform;
+            yAdj = -0.125f;
+        }
+        else if (num == 1)
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Top Middle").transform;
+            yAdj = -0.125f;
+        }
+        else if (num == 2)
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Top Right").transform;
+            yAdj = -0.125f;
+        }
+        else if (num == 3)
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Middle Left").transform;
+            yAdj = -0.5f;
+        }
+        else if (num == 4)
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Middle Middle").transform;
+            yAdj = -0.5f;
+        }
+        else if (num == 5)
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Middle Right").transform;
+            yAdj = -0.5f;
+        }
+        else if (num == 6)
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Bottom Left").transform;
+            yAdj = -0.875f;
+        }
+        else if (num == 7)
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Bottom Middle").transform;
+            yAdj = -0.875f;
+        }
+        else
+        {
+            parent = GameObject.Find("Main Grid/Grid Spots/Grid Bottom Right").transform;
+            yAdj = -0.875f;
+        }
+
+        Transform hl = GameObject.Find("Highlight").transform;
+        hl.localScale = new Vector3(1, 1, 1);
+        hl.position = parent.transform.position;
+        hl.position = new Vector3(hl.position.x, hl.position.y + yAdj, hl.position.z);
+        foreach (var r in hl.GetComponentsInChildren<Renderer>())
+        {
+           r.material = playerPrefab.GetComponentInChildren<Renderer>().sharedMaterial;
+        }
+
+        if (boardsWon.Contains(num))
+        {
+            hl.position = new Vector3(0, -8.5f, 0);
+            hl.localScale = new Vector3(3, 3, 1);
+        }
+    }
 
     void Update()
     {
@@ -421,28 +572,47 @@ public class GameManager : MonoBehaviour
                         {
                             int row = 1; int col = 1;
                             int rowMul = 0; int colMul = 0;
+                            float yAdj = -0.125f;
                             var parentGridXY = hit.transform.parent.parent.name.Split(' ');
                             var childGridXY = hit.transform.name.Split(' ');
 
                             if (parentGridXY[1] == "Middle")
+                            {
                                 rowMul = 3;
+                            }
                             else if (parentGridXY[1] == "Bottom")
+                            {
                                 rowMul = 6;
+                            }
 
                             if (parentGridXY[2] == "Middle")
+                            {
                                 colMul = 3;
+                            }
                             else if (parentGridXY[2] == "Right")
+                            {
                                 colMul = 6;
+                            }
 
                             if (childGridXY[1] == "Middle")
+                            {
                                 row = 2;
+                                yAdj = -0.5f;
+                            }
                             else if (childGridXY[1] == "Bottom")
+                            {
                                 row = 3;
+                                yAdj = -0.875f;
+                            }
 
                             if (childGridXY[2] == "Middle")
+                            {
                                 col = 2;
+                            }
                             else if (childGridXY[2] == "Right")
+                            {
                                 col = 3;
+                            }
 
                             row += rowMul;
                             col += colMul;
@@ -472,18 +642,45 @@ public class GameManager : MonoBehaviour
                                 update_winner(game_won);
                                 return;
                             }
+
+                            int index = 0;
+                            if (hit.transform.name == "Grid Top Left") index = 0;
+                            if (hit.transform.name == "Grid Top Middle") index = 1;
+                            if (hit.transform.name == "Grid Top Right") index = 2;
+                            if (hit.transform.name == "Grid Middle Left") index = 3;
+                            if (hit.transform.name == "Grid Middle Middle") index = 4;
+                            if (hit.transform.name == "Grid Middle Right") index = 5;
+                            if (hit.transform.name == "Grid Bottom Left") index = 6;
+                            if (hit.transform.name == "Grid Bottom Middle") index = 7;
+                            if (hit.transform.name == "Grid Bottom Right") index = 8;
+
+                            Transform hl = GameObject.Find("Highlight").transform;
+                            hl.localScale = new Vector3(1, 1, 1);
+                            hl.position = GameObject.Find("Main Grid/Grid Spots/" + hit.transform.name).transform.position;
+                            hl.position = new Vector3(hl.position.x, hl.position.y + yAdj, hl.position.z);
+                            foreach (var r in hl.GetComponentsInChildren<Renderer>())
+                            {
+                                r.material = botPrefab.GetComponentInChildren<Renderer>().sharedMaterial;
+                            }
+
+                            if (boardsWon.Contains(index))
+                            {
+                                hl.position = new Vector3(0, -8.5f, 0);
+                                hl.localScale = new Vector3(3, 3, 1);
+                            }
+                            GameObject.Find("Canvas/Action Text").GetComponent<Text>().text = "Blue player is deciding where to play...";
                             inputSuccess = true;
                             return;
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        Debug.Log(ex);
                         return;
                     }
                 }
             }
 
-            // Go on ahead mr.bot do your thing
             if (inputSuccess)
             {
                 inputSuccess = false;
@@ -493,17 +690,34 @@ public class GameManager : MonoBehaviour
                 placeBot(bot_state, state);
                 state = bot_state;
                 box_won = update_box_won(bot_state);
+                List<int> possible_moves = get_possible_moves(new Tuple<int, int>(bot_move, int.MinValue));
+                int k = 0; bool seen = false;
+                foreach (List<int> b in boardspots)
+                {
+                    foreach (int i in possible_moves)
+                    {
+                        if (b.Contains(i))
+                        {
+                            seen = true;
+                            updateHighlight(k);
+                            break;
+                        }
+                    }
+                    if (seen) break;
+                    k += 1;
+                }
                 string box_wonI = "";
                 foreach (string i in box_won)
                 {
                     box_wonI += i;
                 }
                 string game_won = check_small_box(box_wonI);
-                if (game_won == ".")
+                if (game_won != ".")
                 {
                     update_winner(game_won);
                     return;
                 }
+                GameObject.Find("Canvas/Action Text").GetComponent<Text>().text = "Red player is deciding where to play...";
             }
         }
     }
