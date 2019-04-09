@@ -363,6 +363,67 @@ public class GameManager : MonoBehaviour
         //gameOver = true;
     }
 
+    void outBoard(string state)
+    {
+        for (int r = 1; r < 10; r++)
+        {
+            string row_str = "";
+            for (int c = 1; c < 10; c++)
+            {
+                row_str += state[get_index(r, c)];
+            }
+            Debug.Log(row_str);
+        }
+    }
+
+    void placeBot(string n, string o)
+    {
+        for (int r = 1; r < 10; r++)
+        {
+            for (int c = 1; c < 10; c++)
+            {
+                if ((n[get_index(r, c)] != o[get_index(r, c)]) && n[get_index(r, c)] == 'O')
+                {
+                    string parentGridXY = "Grid ";
+                    string childGridXY = "Grid ";
+
+                    if (r > 6)
+                        parentGridXY += "Bottom ";
+                    else if (r > 3)
+                        parentGridXY += "Middle ";
+                    else
+                        parentGridXY += "Top ";
+
+                    if (c > 6)
+                        parentGridXY += "Right";
+                    else if (c > 3)
+                        parentGridXY += "Middle";
+                    else
+                        parentGridXY += "Left";
+
+                    if (r  % 3 == 0)
+                        childGridXY += "Bottom ";
+                    else if (r % 3 == 2)
+                        childGridXY += "Middle ";
+                    else
+                        childGridXY += "Top ";
+
+                    if (c % 3 == 0)
+                        childGridXY += "Right";
+                    else if (c % 3 == 2)
+                        childGridXY += "Middle";
+                    else
+                        childGridXY += "Left";
+
+                    var spawn = Instantiate(botPrefab);
+                    spawn.transform.position = GameObject.Find("Main Grid/Grid Spots/" + parentGridXY + "/Grid Points/" + childGridXY).transform.position;
+
+                    Debug.Log("Bot played at: " + parentGridXY + "->" + childGridXY);
+                }
+            }
+        }
+    }
+
     string user_state;
 
     void Update()
@@ -371,7 +432,6 @@ public class GameManager : MonoBehaviour
         {
             if (Input.GetMouseButtonDown(0))
             {
-                Debug.Log("Clicked");
                 Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
                 RaycastHit hit;
                 if (Physics.Raycast(ray, out hit))
@@ -407,7 +467,7 @@ public class GameManager : MonoBehaviour
 
                             row += rowMul;
                             col += colMul;
-                            Debug.Log("Hit: " + row + " " + col);
+                            Debug.Log("Clicked: " + row + " " + col);
                             user_input = new Tuple<int, int>(row, col);
 
                             try
@@ -423,7 +483,6 @@ public class GameManager : MonoBehaviour
 
                             var spawn = Instantiate(playerPrefab);
                             spawn.transform.position = hit.transform.position;
-                            Destroy(hit.transform.gameObject);
 
                             user_state = add_piece(state, user_move, 'X');
                             Debug.Log(user_state);
@@ -460,8 +519,9 @@ public class GameManager : MonoBehaviour
                 Tuple<string, int> mm = minimax(user_state, user_move, "O", depth);
                 string bot_state = mm.Item1;
                 bot_move = mm.Item2;
+                placeBot(bot_state, state);
                 state = bot_state;
-                Debug.Log(bot_state);
+                outBoard(state);
                 box_won = update_box_won(bot_state);
                 string box_wonI = "";
                 foreach (string i in box_won)
