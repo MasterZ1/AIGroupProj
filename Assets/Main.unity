@@ -810,9 +810,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 1452600560}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b36d31599e8e3c94d9c1c62fb4af398a, type: 3}
+  m_Script: {fileID: 11500000, guid: ee18d8a934986a444bd66c3b56208349, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  depth: 5
+  playerPrefab: {fileID: 2617100244539736517, guid: d653ca09eb26f0d4db6cbf951353e867,
+    type: 3}
+  botPrefab: {fileID: 492352007656132652, guid: 80bb6d4667db59c44bc88f91cdbfbd10,
+    type: 3}
 --- !u!4 &1452600562
 Transform:
   m_ObjectHideFlags: 0

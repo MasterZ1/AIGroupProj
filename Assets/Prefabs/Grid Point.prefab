@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 574470694348168547}
   - component: {fileID: 586169790141418369}
   - component: {fileID: 5375989053235982173}
+  - component: {fileID: 5655768130875726621}
   m_Layer: 0
   m_Name: Grid Point
   m_TagString: Untagged
@@ -91,3 +92,19 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+--- !u!54 &5655768130875726621
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4706436318035956545}
+  serializedVersion: 2
+  m_Mass: 1
+  m_Drag: 0
+  m_AngularDrag: 0
+  m_UseGravity: 0
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 126
+  m_CollisionDetection: 0

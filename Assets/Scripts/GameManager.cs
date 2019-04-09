@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
@@ -42,11 +41,11 @@ public static class EnumerableUtilities
     }
 }
 
-
-
 public class GameManager : MonoBehaviour
 {
-    public int depth = 20;
+    public int depth = 5;
+    public GameObject playerPrefab;
+    public GameObject botPrefab;
 
     private string state;
     private List<Tuple<int, int, int>> possible_goals = new List<Tuple<int, int, int>>();
@@ -54,9 +53,8 @@ public class GameManager : MonoBehaviour
     private int bot_move;
     private Tuple<int, int> user_input;
     private Tuple<int, int> user_move;
-    private bool user_moved = false;
     private bool gameOver = false;
-    
+    private bool inputSuccess = false;
 
     // Game Functions
     int get_index(int x, int y)
@@ -79,9 +77,9 @@ public class GameManager : MonoBehaviour
     List<int> indicies_of_box(int i)
     {
         List<int> idxs_box = new List<int>();
-        foreach (var idx in EnumerableUtilities.RangeStep(i * 9, i * 9 + 9))
+        foreach (var idx in EnumerableUtilities.RangeStep(i * 9, (i * 9) + 9))
         {
-            idxs_box.Add(i);
+            idxs_box.Add(idx);
         }
         return idxs_box;
     }
@@ -144,11 +142,13 @@ public class GameManager : MonoBehaviour
 
     Tuple<int, int> check_input(string state, int bot_move)
     {
-        List<int> possible_moves = get_possible_moves(new Tuple<int, int>(bot_move, int.MinValue));
-
-        if (bot_move != -1 && !possible_moves.Contains(get_index(user_input.Item1, user_input.Item2)))
+        if (bot_move != -1)
         {
-            throw new Exception();
+            List<int> possible_moves = get_possible_moves(new Tuple<int, int>(bot_move, int.MinValue));
+            if (!possible_moves.Contains(get_index(user_input.Item1, user_input.Item2)))
+            {
+                throw new Exception();
+            }
         }
 
         if (!isValidInput(state, user_input))
@@ -175,11 +175,14 @@ public class GameManager : MonoBehaviour
     {
         List<string> temp = new List<string>();
         for (int i = 0; i < 9; i++){temp.Add(".");}
-        for (int i = 0; i < 9; i++)
+        for (int k = 0; k < 9; k++)
         {
-            List<int> idxs_box = indicies_of_box(i);
-            string box_str = state.Substring(idxs_box[0], idxs_box[-1] + 1);
-            temp[i] = check_small_box(box_str);
+            List<int> idxs_box = indicies_of_box(k);
+            string pr = "";
+            foreach(int p in idxs_box) { pr += p + " "; }
+            int length = idxs_box[idxs_box.Count - 1] - idxs_box[0] + 1;
+            string box_str = state.Substring(idxs_box[0], length);
+            temp[k] = check_small_box(box_str);
         }
         return temp;
     }
@@ -216,7 +219,7 @@ public class GameManager : MonoBehaviour
         List<Tuple<string, int>> pairs = new List<Tuple<string, int>>();
         for (int i = 0; i < succ.Count; i++)
         {
-            pairs.Add(new Tuple<string, int>(succ[i], moves_idx[1]));
+            pairs.Add(new Tuple<string, int>(succ[i], moves_idx[i]));
         }
         return pairs;
     }
@@ -257,10 +260,11 @@ public class GameManager : MonoBehaviour
         string box_wonI = "";
         foreach (string i in box_won) { box_wonI += i; }
         score += evaluate_small_box(box_wonI, player) * 200;
-        for (int i = 0; i < 9; i++)
+        for (int k = 0; k < 9; k++)
         {
-            List<int> idxs = indicies_of_box(i);
-            string box_str = state.Substring(idxs[0], idxs[-1] + 1);
+            List<int> idxs = indicies_of_box(k);
+            int length = idxs[idxs.Count - 1] - idxs[0] + 1;
+            string box_str = state.Substring(idxs[0], length);
             score += evaluate_small_box(box_str, player);
         }
         return score;
@@ -347,14 +351,6 @@ public class GameManager : MonoBehaviour
         possible_goals.Add(new Tuple<int, int, int>(6, 7, 8));
         box_won = update_box_won(state);
         bot_move = -1;
-        user_input = new Tuple<int, int>(1, 2);
-        user_moved = true;
-    }
-
-    public void doMove(int x, int y)
-    {
-        user_input = new Tuple<int, int>(x, y);
-        user_moved = true;
     }
 
     void update_board(string user_state)
@@ -364,65 +360,120 @@ public class GameManager : MonoBehaviour
 
     void update_winner(string game_won)
     {
-        gameOver = true;
+        //gameOver = true;
     }
+
+    string user_state;
 
     void Update()
     {
         if (!gameOver)
         {
-            // Waiting on player input
-            if (user_moved)
+            if (Input.GetMouseButtonDown(0))
             {
-                Console.WriteLine("Doing Player");
-                try
+                Debug.Log("Clicked");
+                Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+                RaycastHit hit;
+                if (Physics.Raycast(ray, out hit))
                 {
-                    // Check and see if the input was valid
-                    user_move = check_input(state, bot_move);
-                }
-                catch
-                {
-                    // Invalid input leave and do nothing
-                    user_moved = false;
-                    return;
-                }
+                    try
+                    {
+                        if (hit.transform.name.StartsWith("Grid"))
+                        {
+                            int row = 1; int col = 1;
+                            int rowMul = 0; int colMul = 0;
+                            var parentGridXY = hit.transform.parent.parent.name.Split(' ');
+                            var childGridXY = hit.transform.name.Split(' ');
 
-                string user_state = add_piece(state, user_move, 'X');
-                Console.WriteLine(user_state);
-                update_board(user_state);
-                box_won = update_box_won(user_state);
+                            if (parentGridXY[1] == "Middle")
+                                rowMul = 3;
+                            else if (parentGridXY[1] == "Bottom")
+                                rowMul = 6;
+
+                            if (parentGridXY[2] == "Middle")
+                                colMul = 3;
+                            else if (parentGridXY[2] == "Right")
+                                colMul = 6;
+
+                            if (childGridXY[1] == "Middle")
+                                row = 2;
+                            else if (childGridXY[1] == "Bottom")
+                                row = 3;
+
+                            if (childGridXY[2] == "Middle")
+                                col = 2;
+                            else if (childGridXY[2] == "Right")
+                                col = 3;
+
+                            row += rowMul;
+                            col += colMul;
+                            Debug.Log("Hit: " + row + " " + col);
+                            user_input = new Tuple<int, int>(row, col);
+
+                            try
+                            {
+                                // Check and see if the input was valid
+                                user_move = check_input(state, bot_move);
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.Log("Invalid Move");
+                                return;
+                            }
+
+                            var spawn = Instantiate(playerPrefab);
+                            spawn.transform.position = hit.transform.position;
+                            Destroy(hit.transform.gameObject);
+
+                            user_state = add_piece(state, user_move, 'X');
+                            Debug.Log(user_state);
+                            update_board(user_state);
+                            box_won = update_box_won(user_state);
+                            string box_wonI = "";
+                            foreach (string i in box_won)
+                            {
+                                box_wonI += i;
+                            }
+                            string game_won = check_small_box(box_wonI);
+                            if (game_won != ".")
+                            {
+                                update_winner(game_won);
+                                return;
+                            }
+
+                            inputSuccess = true;
+                            return;
+                        }
+                    }
+                    catch
+                    {
+                        Debug.Log("Hit Nothing!");
+                        return;
+                    }
+                }
+            }
+
+            if (inputSuccess)
+            {
+                inputSuccess = false;
+                // Go on ahead mr.bot do your thing
+                Tuple<string, int> mm = minimax(user_state, user_move, "O", depth);
+                string bot_state = mm.Item1;
+                bot_move = mm.Item2;
+                state = bot_state;
+                Debug.Log(bot_state);
+                box_won = update_box_won(bot_state);
                 string box_wonI = "";
                 foreach (string i in box_won)
                 {
                     box_wonI += i;
                 }
                 string game_won = check_small_box(box_wonI);
-                if (game_won != ".")
-                {
-                    update_winner(game_won);
-                    return;
-                }
-
-                Console.WriteLine("Doing Bot");
-                // Go on ahead mr.bot
-                Tuple<string, int> mm = minimax(user_state, user_move, "O", depth);
-                string bot_state = mm.Item1;
-                Console.WriteLine(bot_state);
-                bot_move = mm.Item2;
-                state = bot_state;
-                box_won = update_box_won(bot_state);
-                box_wonI = "";
-                foreach (string i in box_won)
-                {
-                    box_wonI += i;
-                }
-                game_won = check_small_box(box_wonI);
                 if (game_won == ".")
                 {
                     update_winner(game_won);
                     return;
                 }
-                user_moved = false;
             }
         }
     }
