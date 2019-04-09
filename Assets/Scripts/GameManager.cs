@@ -546,13 +546,10 @@ public class GameManager : MonoBehaviour
         hl.position = new Vector3(hl.position.x, hl.position.y + yAdj, hl.position.z);
         foreach (var r in hl.GetComponentsInChildren<Renderer>())
         {
-           r.material = playerPrefab.GetComponentInChildren<Renderer>().sharedMaterial;
-        }
-
-        if (boardsWon.Contains(num))
-        {
-            hl.position = new Vector3(0, -8.5f, 0);
-            hl.localScale = new Vector3(3, 3, 1);
+            if (boardsWon.Contains(num))
+                r.material = transparentMat;
+            else
+                r.material = playerPrefab.GetComponentInChildren<Renderer>().sharedMaterial;
         }
     }
 
@@ -660,14 +657,12 @@ public class GameManager : MonoBehaviour
                             hl.position = new Vector3(hl.position.x, hl.position.y + yAdj, hl.position.z);
                             foreach (var r in hl.GetComponentsInChildren<Renderer>())
                             {
-                                r.material = botPrefab.GetComponentInChildren<Renderer>().sharedMaterial;
+                                if (boardsWon.Contains(index))
+                                    r.material = transparentMat;
+                                else
+                                    r.material = botPrefab.GetComponentInChildren<Renderer>().sharedMaterial;
                             }
 
-                            if (boardsWon.Contains(index))
-                            {
-                                hl.position = new Vector3(0, -8.5f, 0);
-                                hl.localScale = new Vector3(3, 3, 1);
-                            }
                             GameObject.Find("Canvas/Action Text").GetComponent<Text>().text = "Blue player is deciding where to play...";
                             inputSuccess = true;
                             return;
