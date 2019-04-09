@@ -305,7 +305,7 @@ public class GameManager : MonoBehaviour
         foreach (Tuple<string, int> s in succ)
         {
             float val = max_turn(s.Item1, new Tuple<int, int>(s.Item2, int.MinValue), opponent(player), depth - 1, alpha, beta);
-            if (val > beta)
+            if (val < beta)
             {
                 beta = val;
             }
@@ -337,7 +337,6 @@ public class GameManager : MonoBehaviour
         return alpha;
     }
 
-    // Unity Functions
     void Start()
     {
         state = string.Concat(Enumerable.Repeat(".", 81));
@@ -353,27 +352,9 @@ public class GameManager : MonoBehaviour
         bot_move = -1;
     }
 
-    void update_board(string user_state)
-    {
-
-    }
-
     void update_winner(string game_won)
     {
         //gameOver = true;
-    }
-
-    void outBoard(string state)
-    {
-        for (int r = 1; r < 10; r++)
-        {
-            string row_str = "";
-            for (int c = 1; c < 10; c++)
-            {
-                row_str += state[get_index(r, c)];
-            }
-            Debug.Log(row_str);
-        }
     }
 
     void placeBot(string n, string o)
@@ -417,8 +398,6 @@ public class GameManager : MonoBehaviour
 
                     var spawn = Instantiate(botPrefab);
                     spawn.transform.position = GameObject.Find("Main Grid/Grid Spots/" + parentGridXY + "/Grid Points/" + childGridXY).transform.position;
-
-                    Debug.Log("Bot played at: " + parentGridXY + "->" + childGridXY);
                 }
             }
         }
@@ -467,26 +446,20 @@ public class GameManager : MonoBehaviour
 
                             row += rowMul;
                             col += colMul;
-                            Debug.Log("Clicked: " + row + " " + col);
                             user_input = new Tuple<int, int>(row, col);
 
                             try
                             {
-                                // Check and see if the input was valid
                                 user_move = check_input(state, bot_move);
                             }
-                            catch (Exception ex)
+                            catch
                             {
-                                Debug.Log("Invalid Move");
                                 return;
                             }
 
                             var spawn = Instantiate(playerPrefab);
                             spawn.transform.position = hit.transform.position;
-
                             user_state = add_piece(state, user_move, 'X');
-                            Debug.Log(user_state);
-                            update_board(user_state);
                             box_won = update_box_won(user_state);
                             string box_wonI = "";
                             foreach (string i in box_won)
@@ -499,29 +472,26 @@ public class GameManager : MonoBehaviour
                                 update_winner(game_won);
                                 return;
                             }
-
                             inputSuccess = true;
                             return;
                         }
                     }
                     catch
                     {
-                        Debug.Log("Hit Nothing!");
                         return;
                     }
                 }
             }
 
+            // Go on ahead mr.bot do your thing
             if (inputSuccess)
             {
                 inputSuccess = false;
-                // Go on ahead mr.bot do your thing
                 Tuple<string, int> mm = minimax(user_state, user_move, "O", depth);
                 string bot_state = mm.Item1;
                 bot_move = mm.Item2;
                 placeBot(bot_state, state);
                 state = bot_state;
-                outBoard(state);
                 box_won = update_box_won(bot_state);
                 string box_wonI = "";
                 foreach (string i in box_won)
