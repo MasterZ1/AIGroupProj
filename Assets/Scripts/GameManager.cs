@@ -44,6 +44,9 @@ public static class EnumerableUtilities
 public class GameManager : MonoBehaviour
 {
     public int depth = 5;
+    public int fullBoardTrim = 25;
+    public int smallBoardTrim = 5;
+    public int pruneRate = 0;
     public GameObject playerPrefab;
     public GameObject botPrefab;
     public GameObject coverPrefab;
@@ -349,19 +352,39 @@ public class GameManager : MonoBehaviour
         else
             return "X";
     }
-
+    System.Random rnd = new System.Random();
     Tuple<string, int> minimax(string state, Tuple<int, int> last_move, string player, int depth)
     {
         List<Tuple<string, int>> succ = recurse(state, player, last_move);
+
+        if (succ.Count > 9 && fullBoardTrim > 0)
+        {
+            int trimammount = succ.Count / fullBoardTrim;
+            for (int i = 0; i < trimammount; i++)
+            {
+                int roll = rnd.Next(0, succ.Count);
+                succ.RemoveAt(roll);
+            }
+        }
+        else if(smallBoardTrim > 0)
+        {
+            int trimammount = succ.Count / smallBoardTrim;
+            for (int i = 0; i < trimammount; i++)
+            {
+                int roll = rnd.Next(0, succ.Count);
+                succ.RemoveAt(roll);
+            }
+        }
+
         Tuple<float, Tuple<string, int>> best_move = new Tuple<float, Tuple<string, int>>(float.NegativeInfinity, null);
-        foreach(Tuple<string, int> s in succ)
+        System.Threading.Tasks.Parallel.ForEach(succ, s =>
         {
             float val = min_turn(s.Item1, new Tuple<int, int>(s.Item2, int.MinValue), opponent(player), depth - 1, float.NegativeInfinity, float.PositiveInfinity);
             if (val > best_move.Item1)
             {
                 best_move = new Tuple<float, Tuple<string, int>>(val, s);
             }
-        }
+        });
         return best_move.Item2;
     }
 
@@ -369,7 +392,11 @@ public class GameManager : MonoBehaviour
     {
         string box_wonI = "";
         foreach (string i in box_won) {box_wonI += i;}
-        if (depth <= 0 || check_small_box(box_wonI) != ".")
+        bool prune = false;
+        int roll = rnd.Next(0, 100);
+        if (roll < pruneRate)
+            prune = true;
+        if (depth <= 0 || check_small_box(box_wonI) != "." || prune)
         {
             return evaluate(state, opponent(player));
         }
@@ -391,7 +418,11 @@ public class GameManager : MonoBehaviour
     {
         string box_wonI = "";
         foreach (string i in box_won) {box_wonI += i;}
-        if (depth <= 0 || check_small_box(box_wonI) != ".")
+        bool prune = false;
+        int roll = rnd.Next(0, 100);
+        if (roll < pruneRate)
+            prune = true;
+        if (depth <= 0 || check_small_box(box_wonI) != "." || prune)
         {
             return evaluate(state, player);
         }
@@ -614,6 +645,7 @@ public class GameManager : MonoBehaviour
                             row += rowMul;
                             col += colMul;
                             user_input = new Tuple<int, int>(row, col);
+                            Debug.Log(row + " " + col + get_index(row, col));
 
                             try
                             {
@@ -624,6 +656,7 @@ public class GameManager : MonoBehaviour
                                 return;
                             }
 
+                            Debug.Log(bot_move);
                             var spawn = Instantiate(playerPrefab);
                             spawn.transform.position = hit.transform.position;
                             user_state = add_piece(state, user_move, 'X');

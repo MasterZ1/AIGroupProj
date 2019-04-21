@@ -1073,7 +1073,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ee18d8a934986a444bd66c3b56208349, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  depth: 4
+  depth: 6
+  fullBoardTrim: 50
+  smallBoardTrim: 0
+  pruneRate: 0
   playerPrefab: {fileID: 2617100244539736517, guid: d653ca09eb26f0d4db6cbf951353e867,
     type: 3}
   botPrefab: {fileID: 492352007656132652, guid: 80bb6d4667db59c44bc88f91cdbfbd10,
