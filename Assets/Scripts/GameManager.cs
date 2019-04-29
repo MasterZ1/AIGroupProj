@@ -64,6 +64,7 @@ public class GameManager : MonoBehaviour
     private List<int> boardsWon = new List<int>();
     private List<List<int>> boardspots = new List<List<int>>();
     string user_state;
+    public bool parallelOn = false;
 
     int get_index(int x, int y)
     {
@@ -377,14 +378,28 @@ public class GameManager : MonoBehaviour
         }
 
         Tuple<float, Tuple<string, int>> best_move = new Tuple<float, Tuple<string, int>>(float.NegativeInfinity, null);
-        System.Threading.Tasks.Parallel.ForEach(succ, s =>
+        if (parallelOn)
         {
-            float val = min_turn(s.Item1, new Tuple<int, int>(s.Item2, int.MinValue), opponent(player), depth - 1, float.NegativeInfinity, float.PositiveInfinity);
-            if (val > best_move.Item1)
+            System.Threading.Tasks.Parallel.ForEach(succ, s =>
             {
-                best_move = new Tuple<float, Tuple<string, int>>(val, s);
+                float val = min_turn(s.Item1, new Tuple<int, int>(s.Item2, int.MinValue), opponent(player), depth - 1, float.NegativeInfinity, float.PositiveInfinity);
+                if (val > best_move.Item1)
+                {
+                    best_move = new Tuple<float, Tuple<string, int>>(val, s);
+                }
+            });
+        }
+        else
+        {
+            foreach(var s in succ)
+            {
+                float val = min_turn(s.Item1, new Tuple<int, int>(s.Item2, int.MinValue), opponent(player), depth - 1, float.NegativeInfinity, float.PositiveInfinity);
+                if (val > best_move.Item1)
+                {
+                    best_move = new Tuple<float, Tuple<string, int>>(val, s);
+                }
             }
-        });
+        }
         return best_move.Item2;
     }
 
